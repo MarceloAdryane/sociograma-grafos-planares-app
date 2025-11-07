@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-gray-100"> <!-- Cambiado a bg-gray-100 para un fondo más suave -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 1. Título de la pestaña actualizado -->
+    <title>Comprobador y Generador de Sociogramas</title>
+    <!-- 1. Cargar Tailwind CSS para los estilos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilo para el contenedor del gráfico de matplotlib */
+        #plot-output > div {
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            background-color: white; /* Aseguramos fondo blanco para el gráfico */
+            padding: 1rem; /* Pequeño padding alrededor del gráfico */
+        }
+        #loading-message {
+            display: none; /* Oculto por defecto, se muestra con PyScript */
+        }
+    </style>
+
+    <!-- 2. Cargar PyScript (el intérprete de Python para el navegador) -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+
+    <!-- 3. Configurar PyScript para que cargue las librerías necesarias -->
+    <py-config>
+        {
+          "packages": ["networkx", "matplotlib"],
+          "terminal": false
+        }
+    </py-config>
+
+</head>
+<body class="h-full font-sans antialiased">
+    <div class="flex min-h-full items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="w-full max-w-xl space-y-8 bg-white p-10 rounded-xl shadow-2xl"> <!-- Contenedor principal con sombra y fondo blanco -->
+            <div>
+                <!-- 1. Título principal H1 actualizado -->
+                <h1 class="text-center text-4xl font-extrabold tracking-tight text-gray-900"> <!-- Título más grande y negrita -->
+                    Comprobador y Generador de Sociogramas
+                </h1>
+                <p class="mt-4 text-center text-base text-gray-600"> <!-- Texto más descriptivo -->
+                    Evalúa si tus conexiones pueden ser representadas sin cruces y visualiza la solución si es posible.
+                </p>
+            </div>
+
+            <!-- Mensaje de Carga de PyScript -->
+            <div id="loading-message" class="rounded-lg bg-blue-50 p-4"> <!-- Bordes más suaves -->
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.75 15h.5a.75.75 0 000-1.5h-.5a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.25 9H9z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3 flex-1 md:flex md:justify-between">
+                        <p class="text-sm text-blue-700">Cargando el entorno de Python... Esto puede tardar unos segundos la primera vez.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección de Entradas del Usuario -->
+            <div class="space-y-6"> <!-- Eliminado el padding y sombra extra ya que el contenedor principal ya lo tiene -->
+                <div>
+                    <!-- 2. Etiqueta del campo de nodos actualizada -->
+                    <label for="nodesInput" class="block text-sm font-medium leading-6 text-gray-900">Tamaño del Grupo (Nº de Personas)</label>
+                    <div class="mt-2">
+                        <input id="nodesInput" type="number" value="8" min="1" class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"> <!-- Py más grande y px-3 añadido -->
+                    </div>
+                </div>
+
+                <div>
+                    <label for="edgesInput" class="block text-sm font-medium leading-6 text-gray-900">Lista de Aristas (Líneas)</label>
+                    <p class="mt-1 text-xs text-gray-500">Escribe cada par en una nueva línea, separado por una coma. (Ej: 1,2)</p>
+                    <div class="mt-2">
+                        <textarea id="edgesInput" rows="10" class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" placeholder="1,8&#10;1,3&#10;1,4&#10;2,8&#10;2,4&#10;2,6&#10;3,8&#10;3,4&#10;4,6&#10;4,5&#10;4,8&#10;5,6&#10;6,8&#10;7,6&#10;7,4"></textarea> <!-- Py más grande, datos precargados y px-3 añadido -->
+                    </div>
+                </div>
+
+                <button id="checkButton" py-click="check_planarity" class="flex w-full justify-center rounded-md bg-indigo-600 px-4 py-2.5 text-base font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"> <!-- Botón más grande -->
+                    Comprobar Solución
+                </button>
+            </div>
+
+            <!-- Sección de Resultados -->
+            <div class="space-y-4 pt-6"> <!-- Pequeño padding superior para separar -->
+                <!-- Contenedor para mensajes de éxito/error con iconos -->
+                <div id="result-message-container" class="min-h-[4rem]"></div> <!-- Aseguramos un espacio mínimo -->
+                <!-- El gráfico de Python se dibujará aquí -->
+                <div id="plot-output"></div>
+            </div>
+
+            <!-- Footer con tu marca -->
+            <div class="mt-8 text-center text-sm text-gray-500">
+                App Sociograma por Marcelo Barrios
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. El código de Python que se ejecutará en el navegador -->
+    <py-script>
+        import networkx as nx
+        import matplotlib.pyplot as plt
+        from pyscript import display, document
+        import js
+
+        # Ocultar el mensaje de carga cuando PyScript ya está listo para arrancar
+        loading_msg = document.getElementById("loading-message")
+        loading_msg.style.display = "block" # Aseguramos que se muestre al inicio y luego lo ocultamos al final de py-script
+
+
+        def show_message(type, message):
+            """Muestra un mensaje estilizado de éxito, error o info."""
+            container = document.getElementById("result-message-container")
+            if type == "success":
+                icon = '''<svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" /></svg>'''
+                bg_color = "bg-green-50"
+                text_color = "text-green-800"
+            elif type == "error":
+                icon = '''<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94l-1.72-1.72z" clip-rule="evenodd" /></svg>'''
+                bg_color = "bg-red-50"
+                text_color = "text-red-800"
+            else: # info
+                icon = '''<svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.75 15h.5a.75.75 0 000-1.5h-.5a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.25 9H9z" clip-rule="evenodd" /></svg>'''
+                bg_color = "bg-blue-50"
+                text_color = "text-blue-800"
+
+            container.innerHTML = f'''
+                <div class="rounded-md {bg_color} p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            {icon}
+                        </div>
+                        <div class="ml-3 flex-1 md:flex md:justify-between">
+                            <p class="text-sm {text_color}">{message}</p>
+                        </div>
+                    </div>
+                </div>
+            '''
+
+
+        def check_planarity(*args, **kwargs):
+            try:
+                # 1. Limpiar resultados anteriores
+                show_message("info", "Analizando el grafo...") # Muestra un mensaje temporal de análisis
+                plot_div = document.getElementById("plot-output")
+                plot_div.innerHTML = "" # Limpiar el área del gráfico
+
+                # 2. Obtener los datos de los inputs de HTML
+                nodes_input = document.getElementById("nodesInput").value
+                edges_input = document.getElementById("edgesInput").value
+
+                # 3. Procesar los Nodos (ahora "Tamaño del Grupo")
+                if not nodes_input:
+                    # 2. Mensaje de error actualizado
+                    show_message("error", "Debes introducir un tamaño de grupo.")
+                    return
+                
+                num_nodes = int(nodes_input)
+                if num_nodes < 1:
+                    # 2. Mensaje de error actualizado
+                    show_message("error", "El tamaño del grupo debe ser al menos 1.")
+                    return
+
+                # 4. Procesar las Aristas
+                lista_de_aristas = []
+                if not edges_input.strip():
+                    # Si no hay aristas, es planar trivialmente.
+                    # Mostramos los nodos aislados según el tamaño del grupo.
+                    G = nx.Graph()
+                    G.add_nodes_from(range(1, num_nodes + 1))
+                    show_message("success", "No hay aristas. El grafo es planar y muestra los miembros del grupo.")
+                    
+                    plt.clf()
+                    plt.figure(figsize=(6, 6))
+                    # Usar un layout que separe los nodos aunque no haya aristas
+                    pos = nx.spring_layout(G) 
+                    nx.draw(G, pos, with_labels=True, node_color='#a7e9f4', 
+                                   font_weight='bold', node_size=700, 
+                                   font_size=10)
+                    
+                    plt.title("Grupo (Sin Conexiones)", fontsize=14, color='#333')
+                    display(plt, target='plot-output')
+                    return
+
+                lines = edges_input.strip().split('\n')
+                for line in lines:
+                    if line.strip(): # Ignorar líneas vacías
+                        parts = line.split(',')
+                        if len(parts) >= 2:
+                            # Limpiar espacios y convertir a números
+                            u = int(parts[0].strip())
+                            v = int(parts[1].strip())
+                            if not (1 <= u <= num_nodes and 1 <= v <= num_nodes):
+                                # 2. Mensaje de error actualizado
+                                raise ValueError(f"Los nodos {u} o {v} están fuera del rango del grupo (1 a {num_nodes}).")
+                            lista_de_aristas.append((u, v))
+                        else:
+                            raise ValueError(f"Línea mal formada: '{line}'. Formato esperado: 'u,v'")
+
+                # 5. Crear el grafo en NetworkX
+                G = nx.Graph()
+                # Añadir nodos usando la lógica range(1, num_nodes + 1)
+                # Esto asegura que los nodos aislados (ej. '3' en tu ejemplo) se incluyan
+                G.add_nodes_from(range(1, num_nodes + 1)) 
+                G.add_edges_from(lista_de_aristas)
+
+                # 6. Comprobar la planitud
+                es_planar = nx.is_planar(G)
+
+                # 7. Mostrar el resultado
+                if es_planar:
+                    show_message("success", "¡Es Planar! El problema SÍ tiene solución.")
+                    
+                    # Dibujar el gráfico sin cruces
+                    plt.clf() # Limpiar cualquier gráfico anterior
+                    
+                    # Usar draw_planar para la solución sin cruces
+                    # Añadimos plt.figure para un mejor control del tamaño en Pyscript
+                    plt.figure(figsize=(6, 6)) # Tamaño de la figura
+                    nx.draw_planar(G, with_labels=True, node_color='#a7e9f4', 
+                                   font_weight='bold', node_size=700, 
+                                   font_size=10, edge_color='#94a3b8', width=1.5) # Color y grosor de aristas
+                    
+                    plt.title("Solución Planar (Sin Cruces)", fontsize=14, color='#333') # Título con estilo
+                    
+                    # Mostrar el gráfico de matplotlib en el div 'plot-output'
+                    display(plt, target='plot-output')
+                
+                else:
+                    show_message("error", "¡No es Planar! El problema es IMPOSIBLE de resolver sin cruces.")
+            
+            except Exception as e:
+                # Capturar cualquier error (ej. mal formato de aristas)
+                show_message("error", f"Error: {e}. Revisa tus datos.")
+        
+        # Ocultar el mensaje de carga una vez que PyScript está listo
+        loading_msg.style.display = "none"
+
+    </py-script>
+
+</body>
+</html>
